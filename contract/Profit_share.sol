@@ -13,10 +13,12 @@ contract ProfitShare {
 
     // admin
     address owner;
-    // investor:
+    // investors
     mapping(address => uint) private investorAmountMap;
-    uint private investorAmountSum;
+    uint private totalInvestment;
     uint public maxClaimableSession = 0;
+    // record total profit in each session. 
+    // And the length of sessionProfitArray is the count of the session.
     uint [] private sessionProfitArray;
 
     modifier onlyOwner() {
@@ -65,7 +67,7 @@ contract ProfitShare {
 
     function sessionStop() public onlyOwner asSessionStart {
         sessionState = SessionState.END;
-        // recalcuate expired profit in sessionProfitArray in the end of the session. 
+        // check sessionProfitArray and upgrade 0 whenever the session expired.
         uint profitArrayMaxIdx = sessionProfitArray.length.sub(1);
         if (profitArrayMaxIdx >= maxClaimableSession) {
             uint expiredProfitArrayIdx = profitArrayMaxIdx.sub(maxClaimableSession);
@@ -92,10 +94,10 @@ contract ProfitShare {
         require(amount > 0);
 
         investorAmountMap[msg.sender] = investorAmountMap[msg.sender].add(amount);
-        investorAmountSum = investorAmountSum.add(amount);
+        totalInvestment = totalInvestment.add(amount);
         console.log("add investment %d success.", amount);
         console.log("sum of the investment is %d.", investorAmountMap[msg.sender]);
-        console.log("total investment for all investors is %d.", investorAmountSum);
+        console.log("total investment for all investors is %d.", totalInvestment);
     }
 
     function getCurrentSession() public view returns(uint) {
@@ -110,10 +112,10 @@ contract ProfitShare {
         require(investorAmountMap[msg.sender] >= amount);
 
         investorAmountMap[msg.sender] = investorAmountMap[msg.sender].sub(amount);
-        investorAmountSum = investorAmountSum.sub(amount);
+        totalInvestment = totalInvestment.sub(amount);
         console.log("withdraw investment %d success.", amount);
         console.log("sum of the investment is %d.", investorAmountMap[msg.sender]);
-        console.log("total investment for all investors is %d.", investorAmountSum);
+        console.log("total investment for all investors is %d.", totalInvestment);
     }
 
     function claim() public onlyInvestors asSessionStart {
@@ -121,11 +123,8 @@ contract ProfitShare {
         uint expiredProfit = getExpiredSessionProfit();
         console.log("sum of the expired session profit is %d.", expiredProfit);
 
-        // get the investment ratio
-        uint expiredPrfoitRate = investorAmountMap[msg.sender].div(investorAmountSum);
-        console.log("investment ratio of this investor is %d.", expiredPrfoitRate);
-
-        uint claimProfit = expiredPrfoitRate.mul(expiredProfit);
+        // expiredProfit * investment / total investment
+        uint claimProfit = expiredProfit.mul(investorAmountMap[msg.sender]).div(totalInvestment);
         console.log("get the claim profit is %d.", claimProfit);
 
         // reload sessionProfitArray
@@ -139,6 +138,7 @@ contract ProfitShare {
         uint result = 0;
         uint profitArrayMaxIdx = sessionProfitArray.length.sub(1);
         uint profitArrayMinIdx = 0;
+        // get sessions in maxClaimableSession
         if (profitArrayMaxIdx > maxClaimableSession) {
             profitArrayMinIdx = profitArrayMaxIdx.sub(maxClaimableSession);
         }
@@ -152,6 +152,7 @@ contract ProfitShare {
     function reloadSessionProfitArray(uint claimProfit) internal {
         uint profitArrayMaxIdx = sessionProfitArray.length.sub(1);
         uint profitArrayMinIdx = 0;
+        // get sessions in maxClaimableSession
         if (profitArrayMaxIdx > maxClaimableSession) {
             profitArrayMinIdx = profitArrayMaxIdx.sub(maxClaimableSession);
         }
